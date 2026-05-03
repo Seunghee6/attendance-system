@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>학습실 출석 시스템</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ───────────────────────────────────────────
+       TOKENS
+    ─────────────────────────────────────────── */
+    :root {
+      --bg:        #0b0f1a;
+      --surface:   #131929;
+      --border:    #1f2d45;
+      --accent:    #3b82f6;
+      --accent2:   #06b6d4;
+      --success:   #22c55e;
+      --warning:   #f59e0b;
+      --danger:    #ef4444;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Noto Sans KR', sans-serif;
+    }
+
+    /* ───────────────────────────────────────────
+       BASE
+    ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px 40px;
+      /* subtle grid overlay */
+      background-image:
+        linear-gradient(rgba(59,130,246,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ───────────────────────────────────────────
+       HEADER
+    ─────────────────────────────────────────── */
+    .hdr {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .hdr-badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      background: rgba(6,182,212,.08);
+      border: 1px solid rgba(6,182,212,.2);
+      border-radius: 4px;
+      padding: 4px 10px;
+      margin-bottom: 14px;
+    }
+    .hdr h1 {
+      font-size: clamp(1.4rem, 5vw, 1.9rem);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -.02em;
+    }
+    .hdr p {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .875rem;
+    }
+
+    /* ───────────────────────────────────────────
+       CARD
+    ─────────────────────────────────────────── */
+    .card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,.45);
+    }
+    .card-body { padding: 28px 24px 24px; }
+
+    /* ───────────────────────────────────────────
+       INPUT
+    ─────────────────────────────────────────── */
+    .input-wrap { position: relative; margin-bottom: 20px; }
+    .input-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 500;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .input-field {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px 16px;
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .input-field:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+    }
+    .input-field::placeholder { color: var(--muted); }
+
+    /* ───────────────────────────────────────────
+       PROGRESS STEPS
+    ─────────────────────────────────────────── */
+    .steps {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .step {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--border);
+      transition: background .4s;
+    }
+    .step.active  { background: var(--accent); }
+    .step.done    { background: var(--success); }
+    .step.failed  { background: var(--danger); }
+
+    /* ───────────────────────────────────────────
+       LOG BOX
+    ─────────────────────────────────────────── */
+    .log-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      min-height: 120px;
+      margin-bottom: 20px;
+      font-family: var(--mono);
+      font-size: .8rem;
+      line-height: 1.7;
+      overflow-y: auto;
+      max-height: 200px;
+    }
+    .log-box:empty::before {
+      content: '출석 버튼을 누르면 진행 상황이 여기에 표시됩니다.';
+      color: var(--muted);
+    }
+    .log-line { display: flex; gap: 8px; align-items: flex-start; }
+    .log-ts   { color: var(--muted); flex-shrink: 0; }
+    .log-msg  { color: var(--text); }
+    .log-msg.info    { color: var(--text); }
+    .log-msg.ok      { color: var(--success); }
+    .log-msg.warn    { color: var(--warning); }
+    .log-msg.err     { color: var(--danger); }
+
+    /* ───────────────────────────────────────────
+       BUTTON
+    ─────────────────────────────────────────── */
+    .btn-attend {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-family: var(--sans);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      transition: opacity .2s, transform .1s;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-attend:active { transform: scale(.98); }
+    .btn-attend:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+      transform: none;
+    }
+    /* shimmer */
+    .btn-attend::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.12) 50%, transparent 100%);
+      transform: translateX(-100%);
+    }
+    .btn-attend:not(:disabled):hover::after {
+      animation: shimmer .6s forwards;
+    }
+    @keyframes shimmer {
+      to { transform: translateX(100%); }
+    }
+
+    /* ───────────────────────────────────────────
+       RESULT BANNER
+    ─────────────────────────────────────────── */
+    .result {
+      display: none;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: .875rem;
+    }
+    .result.show { display: block; }
+    .result.success {
+      background: rgba(34,197,94,.08);
+      border: 1px solid rgba(34,197,94,.3);
+      color: var(--success);
+    }
+    .result.error {
+      background: rgba(239,68,68,.08);
+      border: 1px solid rgba(239,68,68,.3);
+      color: var(--danger);
+    }
+    .result-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+    .result-detail {
+      font-family: var(--mono);
+      font-size: .78rem;
+      opacity: .85;
+    }
+
+    /* ───────────────────────────────────────────
+       SPINNER (inside button)
+    ─────────────────────────────────────────── */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ───────────────────────────────────────────
+       FOOTER
+    ─────────────────────────────────────────── */
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: .75rem;
+      color: var(--muted);
+    }
+
+    /* ───────────────────────────────────────────
+       PULSE DOT (live indicator)
+    ─────────────────────────────────────────── */
+    .pulse-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      margin-right: 6px;
+      box-shadow: 0 0 0 0 rgba(34,197,94,.5);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(34,197,94,.5); }
+      70%  { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─────────────────────────────────── -->
+<div class="hdr">
+  <div class="hdr-badge">📍 국제관계연구실</div>
+  <h1>출석 인증 시스템</h1>
+  <p>위치·IP 검증 후 자동으로 출석이 기록됩니다.</p>
+</div>
+
+<!-- ─── MAIN CARD ──────────────────────────────── -->
+<div class="card">
+  <div class="card-body">
+
+    <!-- 진행 단계 표시 바 -->
+    <div class="steps" id="steps">
+      <div class="step" id="s1" title="위치 확인"></div>
+      <div class="step" id="s2" title="IP 검증"></div>
+      <div class="step" id="s3" title="서버 전송"></div>
+    </div>
+
+    <!-- 이름 입력 -->
+    <div class="input-wrap">
+      <label class="input-label" for="studentId">이름</label>
+      <input
+        id="studentId"
+        class="input-field"
+        type="text"
+        maxlength="20"
+        placeholder="예) 홍길동"
+        autocomplete="off"
+      />
+    </div>
+
+    <!-- 결과 배너 -->
+    <div class="result" id="result">
+      <div class="result-title" id="result-title"></div>
+      <div class="result-detail" id="result-detail"></div>
+    </div>
+
+    <!-- 실시간 로그 -->
+    <div class="log-box" id="logBox"></div>
+
+    <!-- 출석 버튼 -->
+    <button class="btn-attend" id="attendBtn" onclick="startAttendance()">
+      출석하기
+    </button>
+
+  </div>
+</div>
+
+<!-- ─── FOOTER ─────────────────────────────────── -->
+<div class="footer">
+  <span class="pulse-dot"></span>서버 연결됨 &nbsp;·&nbsp; 데이터는 암호화되어 전송됩니다
+</div>
+
+<!-- ─────────────────────────────────────────────
+  SCRIPT
+───────────────────────────────────────────── -->
+<script>
+// ════════════════════════════════════════════════
+// ✏️  수정 가능한 설정 변수
+// ════════════════════════════════════════════════
+
+// Google Apps Script 웹 앱 URL
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyRBXRW-BzlgaQ8edtk6JdPv_lPpAKoSTn0sFWtTX4LGVHrXrQO98vFlkAoLcg58x4cbg/exec";
+
+// 학습실 GPS 중심 좌표 (위도, 경도)
+const CENTER_LAT = 37.59768;
+const CENTER_LNG = 127.05698;
+
+// 허용 반경 (미터)
+const MAX_DISTANCE_M = 30;
+
+// 허용 IP 대역 (배열로 여러 개 추가 가능)
+const ALLOWED_IP_PREFIXES = ["147.46"];
+
+// GPS를 몇 회 측정해 평균낼지
+const GPS_SAMPLE_COUNT = 3;
+
+
+// ════════════════════════════════════════════════
+// 유틸 함수
+// ════════════════════════════════════════════════
+
+function log(msg, type = "info") {
+  const box = document.getElementById("logBox");
+  const now = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+  const line = document.createElement("div");
+  line.className = "log-line";
+  line.innerHTML = `<span class="log-ts">[${now}]</span><span class="log-msg ${type}">${msg}</span>`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function setStep(n, state) { // state: 'active' | 'done' | 'failed'
+  const el = document.getElementById("s" + n);
+  el.className = "step " + state;
+}
+
+function showResult(type, title, detail) {
+  const el = document.getElementById("result");
+  el.className = "result show " + type;
+  document.getElementById("result-title").textContent = title;
+  document.getElementById("result-detail").textContent = detail;
+}
+
+function setBtn(loading) {
+  const btn = document.getElementById("attendBtn");
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? '<span class="spinner"></span>처리 중...'
+    : '출석하기';
+}
+
+// 두 GPS 좌표 간 거리 계산 (Haversine, 단위: 미터)
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// GPS 단일 측정 (Promise 래핑)
+function getPosition(opts) {
+  return new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(resolve, reject, opts)
+  );
+}
+
+// GPS N회 측정 후 평균 반환
+async function getAveragePosition(n) {
+  const opts = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+  const results = [];
+  for (let i = 0; i < n; i++) {
+    log(`📡 GPS 측정 중... (${i + 1}/${n})`);
+    const pos = await getPosition(opts);
+    results.push({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    await new Promise(r => setTimeout(r, 600)); // 측정 간 간격
+  }
+  const avgLat = results.reduce((s, p) => s + p.lat, 0) / n;
+  const avgLng = results.reduce((s, p) => s + p.lng, 0) / n;
+  return { lat: avgLat, lng: avgLng };
+}
+
+// IP 가져오기
+async function getPublicIp() {
+  const res = await fetch("https://api.ipify.org?format=json");
+  const data = await res.json();
+  return data.ip;
+}
+
+
+// ════════════════════════════════════════════════
+// 메인 출석 로직
+// ════════════════════════════════════════════════
+
+async function startAttendance() {
+  // 초기화
+  document.getElementById("logBox").innerHTML = "";
+  document.getElementById("result").className = "result";
+  ["s1","s2","s3"].forEach(id => document.getElementById(id).className = "step");
+  setBtn(true);
+
+  // ── 학번 검증 ──────────────────────────────
+  const studentId = document.getElementById("studentId").value.trim();
+  if (!studentId || studentId.length < 2) {
+    log("❌ 이름을 올바르게 입력해주세요. (2글자 이상)", "err");
+    showResult("error", "입력 오류", "이름을 입력해주세요.");
+    setBtn(false);
+    return;
+  }
+
+  try {
+
+    // ── STEP 1: GPS 확인 ─────────────────────
+    setStep(1, "active");
+    log("📍 위치 정보를 가져오는 중...", "info");
+
+    if (!navigator.geolocation) {
+      throw new Error("이 브라우저는 위치 정보를 지원하지 않습니다.");
+    }
+
+    let avgPos;
+    try {
+      avgPos = await getAveragePosition(GPS_SAMPLE_COUNT);
+    } catch (gpsErr) {
+      const msg = gpsErr.code === 1
+        ? "위치 권한이 거부되었습니다. 브라우저 설정에서 위치 허용 후 다시 시도해주세요."
+        : "위치 정보를 가져올 수 없습니다. (" + gpsErr.message + ")";
+      throw new Error(msg);
+    }
+
+    const dist = Math.round(haversine(avgPos.lat, avgPos.lng, CENTER_LAT, CENTER_LNG));
+    log(`📌 현재 위치: ${avgPos.lat.toFixed(5)}, ${avgPos.lng.toFixed(5)}`, "info");
+    log(`📏 학습실까지 거리: ${dist}m (허용 반경: ${MAX_DISTANCE_M}m)`, dist <= MAX_DISTANCE_M ? "ok" : "err");
+
+    if (dist > MAX_DISTANCE_M) {
+      setStep(1, "failed");
+      throw new Error(`위치 인증 실패: 학습실에서 ${dist}m 떨어져 있습니다. (허용: ${MAX_DISTANCE_M}m 이내)`);
+    }
+
+    log("✅ 위치 인증 통과!", "ok");
+    setStep(1, "done");
+
+    // ── STEP 2: IP 검증 ──────────────────────
+    setStep(2, "active");
+    log("🌐 IP 주소를 확인하는 중...", "info");
+
+    let userIp;
+    try {
+      userIp = await getPublicIp();
+    } catch {
+      throw new Error("IP 주소를 가져올 수 없습니다. 네트워크 연결을 확인해주세요.");
+    }
+
+    log(`🖥️ 현재 IP: ${userIp}`, "info");
+
+    const ipAllowed = ALLOWED_IP_PREFIXES.some(prefix => userIp.startsWith(prefix));
+    if (!ipAllowed) {
+      log(`❌ 허용되지 않은 IP 대역입니다. (허용: ${ALLOWED_IP_PREFIXES.join(", ")}...)`, "err");
+      setStep(2, "failed");
+      throw new Error(`IP 인증 실패: 학교 네트워크(${ALLOWED_IP_PREFIXES.join(", ")}...)에 연결해주세요.`);
+    }
+
+    log("✅ IP 인증 통과!", "ok");
+    setStep(2, "done");
+
+    // ── STEP 3: 서버 전송 ────────────────────
+    setStep(3, "active");
+    log("📤 출석 데이터를 서버에 전송하는 중...", "info");
+
+    const payload = {
+      studentId: studentId,
+      userIp:    userIp,
+      lat:       avgPos.lat,
+      lng:       avgPos.lng,
+      status:    "출석"
+    };
+
+    const res = await fetch(SCRIPT_URL, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload),
+      redirect: "follow"
+    });
+
+    const json = await res.json();
+
+    if (json.status !== "success") {
+      setStep(3, "failed");
+      throw new Error("서버 오류: " + (json.message || "알 수 없는 오류"));
+    }
+
+    log("✅ 출석 기록 완료!", "ok");
+    setStep(3, "done");
+
+    showResult(
+      "success",
+      "🎉 출석 완료!",
+      `${json.data.date} ${json.data.time} · 학번 ${json.data.studentId} · ${json.data.status}`
+    );
+
+  } catch (err) {
+    log("🚫 " + err.message, "err");
+    showResult("error", "⛔ 출석 실패", err.message);
+  } finally {
+    setBtn(false);
+  }
+}
+
+// Enter 키 지원
+document.getElementById("studentId").addEventListener("keydown", e => {
+  if (e.key === "Enter") startAttendance();
+});
+</script>
+</body>
+</html>
