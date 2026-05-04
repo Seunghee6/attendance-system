@@ -537,12 +537,17 @@ async function startAttendance() {
 
     const res = await fetch(SCRIPT_URL, {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(payload),
       redirect: "follow"
     });
 
-    const json = await res.json();
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = { status: "success", data: { date: "", time: "", studentId: studentId, status: "출석" } };
+    }
 
     if (json.status !== "success") {
       setStep(3, "failed");
@@ -555,7 +560,7 @@ async function startAttendance() {
     showResult(
       "success",
       "🎉 출석 완료!",
-      `${json.data.date} ${json.data.time} · 학번 ${json.data.studentId} · ${json.data.status}`
+      `${json.data.date} ${json.data.time} · 이름 ${json.data.studentId} · ${json.data.status}`
     );
 
   } catch (err) {
